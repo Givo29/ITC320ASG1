@@ -1,46 +1,35 @@
 const vShader = `
 attribute vec3 aPosition; 
-attribute vec3 aColour;
-varying vec3 vColour;
+attribute vec2 aTextureCoordinate;
+varying vec2 varyTextureCoordinate;
 uniform mat4 umWorldMatrix;
 
 void main() {
-	vColour=aColour;
-	vec4 transformedPos = umWorldMatrix * vec4(aPosition,1.0);
+	varyTextureCoordinate = aTextureCoordinate;
+	vec4 transformedPos = umWorldMatrix*vec4(aPosition,1.0);
     gl_Position = transformedPos; 
 }
 `;
 
 const fShader = `
 precision mediump float; 
-varying vec3 vColour;
+varying vec2 varyTextureCoordinate;
+uniform sampler2D myTexture;
 
-void main() { 
-  gl_FragColor = vec4( vColour, 1.0 ); 
+void main()  { 
+	gl_FragColor = texture2D(myTexture, varyTextureCoordinate);
 }
 `;
 
 let gl;
-let rotation = 0;
 
 window.onload = (_) => {
   const canvas = document.getElementById("glCanvas");
   gl = WebGLUtils.setupWebGL(canvas);
   if (!gl) alert("WebGL isn't available");
 
-  const car = new objectParser("Assets/meshes/H3.obj");
-
-  const points = car.vertexPositions;
-  const span = car.span;
-  const offset = car.offset;
-
-  let colours = [];
-
-  for (let i = 0; i < points.length / 3; i++) {
-    colours.push(vec3(1, 0, 0));
-    colours.push(vec3(0, 1, 0));
-    colours.push(vec3(0, 0, 1));
-  }
+  const house = new objectParser("Assets/meshes/H3.obj");
+  const houseTexture = new TGAParser(gl, "Assets/textures/H3_1.tga");
 
   gl.viewport(0, 0, canvas.width, canvas.height);
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
@@ -48,10 +37,13 @@ window.onload = (_) => {
   let program = initShaders(gl, vShader, fShader);
   gl.useProgram(program);
 
+  gl.uniform1i(gl.getUniformLocation(program, "myTexture"), 0);
+  gl.activeTexture(gl.TEXTURE0);
+
   // Position buffer
   const posBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, flatten(points), gl.STATIC_DRAW);
+  gl.bufferData(gl.ARRAY_BUFFER, flatten(house.pPoints), gl.STATIC_DRAW);
 
   const vPos = gl.getAttribLocation(program, "aPosition");
   gl.vertexAttribPointer(vPos, 3, gl.FLOAT, false, 0, 0);
@@ -60,36 +52,36 @@ window.onload = (_) => {
   // Colour buffer
   const colBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, colBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, flatten(colours), gl.STATIC_DRAW);
+  gl.bufferData(gl.ARRAY_BUFFER, flatten(house.tPoints), gl.STATIC_DRAW);
 
-  const vCol = gl.getAttribLocation(program, "aColour");
-  gl.vertexAttribPointer(vCol, 3, gl.FLOAT, false, 0, 0);
+  const vCol = gl.getAttribLocation(program, "aTextureCoordinate");
+  gl.vertexAttribPointer(vCol, 2, gl.FLOAT, false, 0, 0);
   gl.enableVertexAttribArray(vCol);
 
   const worldMatrixLocation = gl.getUniformLocation(program, "umWorldMatrix");
   gl.enable(gl.DEPTH_TEST);
 
-  setInterval(render, 16, span, offset, worldMatrixLocation, points);
+  setInterval(render, 16, house, houseTexture, worldMatrixLocation);
 };
 
-function render(span, offset, worldMatrixLocation, points) {
+function render(house, houseTexture, worldMatrixLocation) {
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.bindTexture(gl.TEXTURE_2D, houseTexture.texture);
+
   let projectionMatrix = perspective(45, 640.0 / 640.0, 2.1, 10000.0);
   let viewMatrix = lookAt([0, 0, -20], [0, 0, 10], [0, 1, 0]);
-  rotation += 0.5;
+  let projViewMatrix = mult(projectionMatrix, viewMatrix);
+  let initMatrix = mult(
+    scalem(1.0 / house.radius, 1.0 / house.radius, 1.0 / house.radius),
+    translate(-house.offset[0], -house.offset[1], -house.offset[2])
+  );
+
+  initMatrix = scalem(1.0 / house.radius, 1.0 / house.radius, 1.0 / house.radius)
+
   const worldMatrix = mult(
-    projectionMatrix,
-    mult(
-      viewMatrix,
-      mult(
-        rotate(rotation, [0, 1, 0]),
-        mult(
-          scalem(3.0 / span[0], 3.0 / span[1], 3.0 / span[2]),
-          translate(-offset[0], -offset[1], -offset[2])
-        )
-      )
-    )
+    projViewMatrix,
+    mult(rotate(0, [0, 1, 0]), initMatrix)
   );
   gl.uniformMatrix4fv(worldMatrixLocation, gl.FALSE, flatten(worldMatrix));
-  gl.drawArrays(gl.TRIANGLES, 0, points.length);
+  gl.drawArrays(gl.TRIANGLES, 0, house.pPoints.length);
 }
