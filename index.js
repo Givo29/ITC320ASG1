@@ -1,99 +1,95 @@
-const canvas = document.getElementById("glCanvas");
-const gl = canvas.getContext("webgl");
+const vShader = `
+attribute vec3 aPosition; 
+attribute vec3 aColour;
+varying vec3 vColour;
+uniform mat4 umWorldMatrix;
 
-if (!gl) {
-  throw new Error("WebGL not supported!");
+void main() {
+	vColour=aColour;
+	vec4 transformedPos = umWorldMatrix * vec4(aPosition,1.0);
+    gl_Position = transformedPos; 
 }
+`;
 
-const vertexData = new Float32Array([0, 1, 0, -1, -1, 0, 1, -1, 0]);
-const colourData = new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+const fShader = `
+precision mediump float; 
+varying vec3 vColour;
 
-const positionBuffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-gl.bufferData(gl.ARRAY_BUFFER, vertexData, gl.STATIC_DRAW);
+void main() { 
+  gl_FragColor = vec4( vColour, 1.0 ); 
+}
+`;
 
-const colourBuffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, colourBuffer);
-gl.bufferData(gl.ARRAY_BUFFER, colourData, gl.STATIC_DRAW);
+let gl;
+let rotation = 0;
 
-const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-gl.shaderSource(
-  vertexShader,
-  `
-  precision mediump float;
+window.onload = (_) => {
+  const canvas = document.getElementById("glCanvas");
+  gl = WebGLUtils.setupWebGL(canvas);
+  if (!gl) alert("WebGL isn't available");
 
-  attribute vec3 position;
-  attribute vec3 colour;
-  varying vec3 vColour;
+  const car = new objectParser("Assets/meshes/H3.obj");
 
-  uniform mat4 matrix;
+  const points = car.vertexPositions;
+  const span = car.span;
+  const offset = car.offset;
 
-  void main() {
-    vColour = colour;
-    gl_Position = matrix * vec4(position, 1.0);
+  let colours = [];
+
+  for (let i = 0; i < points.length / 3; i++) {
+    colours.push(vec3(1, 0, 0));
+    colours.push(vec3(0, 1, 0));
+    colours.push(vec3(0, 0, 1));
   }
-`
-);
-gl.compileShader(vertexShader);
 
-const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-gl.shaderSource(
-  fragmentShader,
-  `
-  precision mediump float;
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
-  varying vec3 vColour;
+  let program = initShaders(gl, vShader, fShader);
+  gl.useProgram(program);
 
-  void main() {
-    gl_FragColor = vec4(vColour, 1.0);
-  }
-`
-);
-gl.compileShader(fragmentShader);
+  // Position buffer
+  const posBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, flatten(points), gl.STATIC_DRAW);
 
-const program = gl.createProgram();
-gl.attachShader(program, vertexShader);
-gl.attachShader(program, fragmentShader);
-gl.linkProgram(program);
+  const vPos = gl.getAttribLocation(program, "aPosition");
+  gl.vertexAttribPointer(vPos, 3, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(vPos);
 
-const positionLocation = gl.getAttribLocation(program, "position");
-gl.enableVertexAttribArray(positionLocation);
-gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-gl.vertexAttribPointer(
-  positionLocation,
-  vertexData.length / 3,
-  gl.FLOAT,
-  false,
-  0,
-  0
-);
+  // Colour buffer
+  const colBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, colBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, flatten(colours), gl.STATIC_DRAW);
 
-const colourLocation = gl.getAttribLocation(program, "colour");
-gl.enableVertexAttribArray(colourLocation);
-gl.bindBuffer(gl.ARRAY_BUFFER, colourBuffer);
-gl.vertexAttribPointer(
-  colourLocation,
-  colourData.length / 3,
-  gl.FLOAT,
-  false,
-  0,
-  0
-);
+  const vCol = gl.getAttribLocation(program, "aColour");
+  gl.vertexAttribPointer(vCol, 3, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(vCol);
 
-gl.useProgram(program);
+  const worldMatrixLocation = gl.getUniformLocation(program, "umWorldMatrix");
+  gl.enable(gl.DEPTH_TEST);
 
-const uniformLocations = {
-  matrix: gl.getUniformLocation(program, "matrix"),
+  setInterval(render, 16, span, offset, worldMatrixLocation, points);
 };
 
-let matrix = mat4();
-matrix = mult(matrix, translate(0.2, 0.5, 1));
-matrix = mult(matrix, scalem(0.25, 0.25, 0.25));
-
-function animate() {
-  requestAnimationFrame(animate);
-  gl.uniformMatrix4fv(uniformLocations.matrix, false, flatten(mult(matrix, rotate(90, [0, 0, 1]))));
-  gl.drawArrays(gl.TRIANGLES, 0, 3);
+function render(span, offset, worldMatrixLocation, points) {
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  let projectionMatrix = perspective(45, 640.0 / 640.0, 2.1, 10000.0);
+  let viewMatrix = lookAt([0, 0, -20], [0, 0, 10], [0, 1, 0]);
+  rotation += 0.5;
+  const worldMatrix = mult(
+    projectionMatrix,
+    mult(
+      viewMatrix,
+      mult(
+        rotate(rotation, [0, 1, 0]),
+        mult(
+          scalem(3.0 / span[0], 3.0 / span[1], 3.0 / span[2]),
+          translate(-offset[0], -offset[1], -offset[2])
+        )
+      )
+    )
+  );
+  gl.uniformMatrix4fv(worldMatrixLocation, gl.FALSE, flatten(worldMatrix));
+  gl.drawArrays(gl.TRIANGLES, 0, points.length);
 }
-
-requestAnimationFrame(animate);
