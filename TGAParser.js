@@ -1,7 +1,8 @@
-function TGAParser(gl, file) {
-  this.texture;
+async function parseTGA(gl, file) {
+  let texture;
 
-  const data = new Uint8Array(loadFileAJAX(file));
+  const encodedData = await fetch(file).then(response => response.arrayBuffer());
+  const data = new Uint8Array(encodedData);
 
   const width = data[12] + (data[13] << 8);
   const height = data[14] + (data[15] << 8);
@@ -14,8 +15,8 @@ function TGAParser(gl, file) {
     data[i + 2] = data[i + 18];
   }
 
-  this.texture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, this.texture);
+  texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
 
   gl.texImage2D(
     gl.TEXTURE_2D,
@@ -38,4 +39,6 @@ function TGAParser(gl, file) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
 
   gl.generateMipmap(gl.TEXTURE_2D);
+
+  return texture
 }

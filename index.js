@@ -23,13 +23,14 @@ void main()  {
 
 let gl;
 
-window.onload = (_) => {
+window.onload = async (_) => {
   const canvas = document.getElementById("glCanvas");
   gl = WebGLUtils.setupWebGL(canvas);
   if (!gl) alert("WebGL isn't available");
 
-  const house = new objectParser("Assets/meshes/H3.obj");
-  const houseTexture = new TGAParser(gl, "Assets/textures/H3_1.tga");
+  const house = new objectParser("Assets/meshes/H1.obj");
+
+  const houseTexture = await parseTGA(gl, "Assets/textures/H1.tga");
 
   gl.viewport(0, 0, canvas.width, canvas.height);
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
@@ -66,21 +67,27 @@ window.onload = (_) => {
 
 function render(house, houseTexture, worldMatrixLocation) {
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  gl.bindTexture(gl.TEXTURE_2D, houseTexture.texture);
+
+  if (houseTexture === null) return;
+  gl.bindTexture(gl.TEXTURE_2D, houseTexture);
 
   let projectionMatrix = perspective(45, 640.0 / 640.0, 2.1, 10000.0);
   let viewMatrix = lookAt([0, 0, -20], [0, 0, 10], [0, 1, 0]);
   let projViewMatrix = mult(projectionMatrix, viewMatrix);
   let initMatrix = mult(
     scalem(1.0 / house.radius, 1.0 / house.radius, 1.0 / house.radius),
-    translate(-house.offset[0], -house.offset[1], -house.offset[2])
+    translate(-house.center[0], -house.center[1], -house.center[2])
   );
 
-  initMatrix = scalem(1.0 / house.radius, 1.0 / house.radius, 1.0 / house.radius)
+  initMatrix = scalem(
+    2.0 / house.radius,
+    2.0 / house.radius,
+    2.0 / house.radius
+  );
 
   const worldMatrix = mult(
     projViewMatrix,
-    mult(rotate(0, [0, 1, 0]), initMatrix)
+    mult(rotate(45, [0, 1, 0]), initMatrix)
   );
   gl.uniformMatrix4fv(worldMatrixLocation, gl.FALSE, flatten(worldMatrix));
   gl.drawArrays(gl.TRIANGLES, 0, house.pPoints.length);
