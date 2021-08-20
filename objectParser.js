@@ -1,9 +1,13 @@
-function objectParser(file) {
+function objectParser(file, texture, scale=[1, 1, 1], pos=[0, 0, 0], rot = 45) {
   this.pPoints = [];
   this.tPoints = [];
   this.span = [];
   this.radius = 0;
   this.center = [];
+  this.scale = scale;
+  this.pos = pos;
+  this.rotation = rot;
+  this.texture = texture;
 
   const lines = loadFileAJAX(file).split("\n");
   if (!lines) alert(`Could not get data from ${file}`);
@@ -39,10 +43,7 @@ function objectParser(file) {
 
     if (line[0] === "v" && line[1] === "t") {
       const vertex = line.split(" ");
-      const newPosition = [
-        parseFloat(vertex[1]),
-        parseFloat(vertex[2]),
-      ];
+      const newPosition = [parseFloat(vertex[1]), parseFloat(vertex[2])];
       tVertices.push(newPosition);
     }
 
@@ -56,8 +57,11 @@ function objectParser(file) {
       });
     }
   });
-
   this.span = [maxX - minX, maxY - minY, maxZ - minZ];
-  this.center = [(maxX + minX) / 2.0, (maxY + minY) / 2.0, (maxZ + minZ) / 2.0];
-  this.radius = Math.sqrt((this.center[0]-minX)*(this.center[0]-minX) + (this.center[1]-minY)*(this.center[1]-minY) + (this.center[2]-minZ)*(this.center[2]-minZ));
+  this.center = [((maxX + minX) / 2.0), (maxY + minY) / 2.0, (maxZ + minZ) / 2.0];
+  this.radius = Math.sqrt(
+    (this.center[0] - minX) * (this.center[0] - minX) +
+      (this.center[1] - minY) * (this.center[1] - minY) +
+      (this.center[2] - minZ) * (this.center[2] - minZ)
+  );
 }
