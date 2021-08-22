@@ -1,3 +1,15 @@
+/** 
+ * This is the main function for the object/texture parser. It must 
+ * be async due to the use of the fetch API to retrieve the files.
+ * @param {WebGLRenderingContext} gl - The WebGL context
+ * @param {string} type - The type of object to be parsed
+ * @param {string} objFile - The file path of the object to be parsed
+ * @param {string} textureFile - The file path of the texture to be parsed
+ * @param {Array} scale - The scale of the object
+ * @param {Array} pos - The position of the object
+ * @param {Number} rot - The rotation of the object
+ * @returns {Object} - The parsed object
+ **/
 async function parseObject(
   gl,
   type,
@@ -35,6 +47,7 @@ async function parseObject(
   const textureData = new Uint8Array(encodedTexture);
   const texture = setupTexture(gl, textureData);
 
+  // Setting up the object
   object.scale = scale;
   object.pos = pos;
   object.rotation = rot;
@@ -44,14 +57,25 @@ async function parseObject(
   return object;
 }
 
+/**
+ * This function takes in the object data and sets up the object
+ * @param {Array} data - The object data
+ * @returns {Object} - The object
+ **/
 function setupObject(data) {
   let pPoints = [];
   let tPoints = [];
 
+  // Getting the vertices
   let minX, maxX, minY, maxY, minZ, maxZ;
   let pVertices = [];
   let tVertices = [];
 
+  /**
+   * The following code is a refactored version of 
+   * the example object parser code that has been 
+   * provided to us
+   **/
   data.forEach((line) => {
     // Object Coordinates
     if (line[0] === "v" && line[1] === " ") {
@@ -64,6 +88,7 @@ function setupObject(data) {
 
       pVertices.push(newPosition);
 
+      // Setting min and max values of the object
       if (pVertices.length === 1) {
         minX = maxX = newPosition[0];
         minY = maxY = newPosition[1];
@@ -108,25 +133,41 @@ function setupObject(data) {
       (center[2] - minZ) * (center[2] - minZ)
   )
   }
+  /** End refactored code **/
 }
 
+/**
+ * This function takes in the texture data and sets up the texture
+ * @param {WebGLRenderingContext} gl - The WebGL context
+ * @param {Array} data - The texture data
+ * @returns {WebGLTexture} - The texture
+ **/
 function setupTexture(gl, data) {
   let texture;
 
+    /**
+   * The following code is a refactored version of 
+   * the example texture parser code that has been 
+   * provided to us
+   **/
+  // Set dimensions of texture
   const width = data[12] + (data[13] << 8);
   const height = data[14] + (data[15] << 8);
   const pixelDepth = data[16];
   const channelNum = pixelDepth / 8;
 
+  // Set texture points
   for (let i = 0; i < width * height * channelNum; i += channelNum) {
     data[i] = data[i + 18 + 2];
     data[i + 1] = data[i + 18 + 1];
     data[i + 2] = data[i + 18];
   }
 
+  // Create and bind texture object
   texture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, texture);
 
+  // Set texture parameters
   gl.texImage2D(
     gl.TEXTURE_2D,
     0,
@@ -148,6 +189,7 @@ function setupTexture(gl, data) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
 
   gl.generateMipmap(gl.TEXTURE_2D);
+  /** End refactored code **/
 
   return texture;
 }
